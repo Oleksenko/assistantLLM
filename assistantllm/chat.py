@@ -5,7 +5,7 @@ from openai import OpenAI
 from rich.console import Console
 from rich.text import Text
 from rich.syntax import Syntax
-from file_reader import read_file_content, file_exists, is_project_file
+from .file_reader import read_file_content, file_exists, is_project_file
 
 # Инициализация консоли rich
 console = Console()
