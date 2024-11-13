@@ -34,15 +34,24 @@ conversation_history = [
 ]
 
 def execute_command(command):
-    """Выполняет команду в терминале и возвращает результат."""
+    """Выполняет команду в терминале с обработкой вывода."""
     try:
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
-        if result.returncode == 0:
-            return result.stdout.strip()  # Успешный результат
+        # Открываем процесс для выполнения команды
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        # Построчный вывод результата
+        for line in process.stdout:
+            console.print(line.strip())
+
+        # Проверяем завершение процесса
+        process.wait()
+        if process.returncode == 0:
+            return "[bold green]Command executed successfully![/bold green]"
         else:
-            return f"[red]Error:[/red] {result.stderr.strip()}"  # Ошибка выполнения
+            return f"[red]Error:[/red] Command failed with exit code {process.returncode}"
     except Exception as e:
         return f"[red]Failed to execute command:[/red] {e}"
+
 
 def detect_and_confirm_command(reply):
     """Определяет, содержит ли ответ команду, и спрашивает, нужно ли её выполнить."""
