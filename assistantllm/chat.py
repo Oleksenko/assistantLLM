@@ -3,8 +3,6 @@ import json
 import subprocess
 from openai import OpenAI
 from rich.console import Console
-from rich.text import Text
-from rich.syntax import Syntax
 
 # Инициализация консоли rich
 console = Console()
@@ -30,28 +28,52 @@ client = OpenAI(
 
 # История диалога
 conversation_history = [
-    {"role": "system", "content": "You are a helpful assistant for a software project. If a user asks for a terminal command, provide the command clearly."}
+    {"role": "system", "content": "You are a helpful assistant for analyzing code and answering software-related questions."}
 ]
 
-def execute_command(command):
-    """Выполняет команду в терминале с обработкой вывода."""
+def read_file_content(file_path):
+    """Читает содержимое файла."""
+    if not os.path.exists(file_path):
+        return None, f"File {file_path} not found."
     try:
-        # Открываем процесс для выполнения команды
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        with open(file_path, "r") as file:
+            content = file.read()
+        return content, None
+    except Exception as e:
+        return None, f"Error reading file {file_path}: {e}"
 
-        # Построчный вывод результата
-        for line in process.stdout:
-            console.print(line.strip())
+def analyze_file(file_path):
+    """Анализирует содержимое файла с помощью LLM."""
+    content, error = read_file_content(file_path)
+    if error:
+        return error
 
-        # Проверяем завершение процесса
-        process.wait()
-        if process.returncode == 0:
-            return "[bold green]Command executed successfully![/bold green]"
+    # Проверяем, не превышает ли содержимое лимит
+    max_lines = 100
+    lines = content.split("\n")
+    if len(lines) > max_lines:
+        content = "\n".join(lines[:max_lines]) + "\n... [Truncated: File too large]"
+
+    # Отправляем содержимое файла в LLM
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=conversation_history + [{"role": "user", "content": f"Analyze the following code:\n\n{content}"}]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Error interacting with LLM: {e}"
+
+def execute_command(command):
+    """Выполняет команду в терминале и возвращает результат."""
+    try:
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()  # Успешный результат
         else:
-            return f"[red]Error:[/red] Command failed with exit code {process.returncode}"
+            return f"[red]Error:[/red] {result.stderr.strip()}"  # Ошибка выполнения
     except Exception as e:
         return f"[red]Failed to execute command:[/red] {e}"
-
 
 def detect_and_confirm_command(reply):
     """Определяет, содержит ли ответ команду, и спрашивает, нужно ли её выполнить."""
@@ -74,6 +96,7 @@ def detect_and_confirm_command(reply):
 
 def chat():
     console.print("[bold green]Starting LLM assistant. Type 'exit' to quit.[/bold green]")
+    project_dir = os.getcwd()  # Текущая директория проекта
     while True:
         user_input = console.input("[bold blue]You:[/bold blue] ")
 
@@ -81,6 +104,14 @@ def chat():
             console.print("[bold red]Goodbye![/bold red]")
             break
         
+        # Проверяем, является ли ввод путём к файлу
+        possible_path = os.path.join(project_dir, user_input)
+        if os.path.isfile(possible_path):
+            console.print(f"[bold yellow]File detected:[/bold yellow] {user_input}")
+            result = analyze_file(possible_path)
+            console.print(f"[bold yellow]Analysis Result:[/bold yellow]\n{result}")
+            continue
+
         # Добавляем сообщение пользователя в историю
         conversation_history.append({"role": "user", "content": user_input})
         
@@ -92,7 +123,7 @@ def chat():
             )
             reply = response.choices[0].message.content.strip()
 
-            # Проверяем, содержит ли ответ команду и спрашиваем, выполнять ли её
+            # Проверяем, содержит ли ответ команду
             modified_reply = detect_and_confirm_command(reply)
 
             # Выводим ответ (с учётом модификации)
