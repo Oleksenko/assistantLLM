@@ -44,15 +44,24 @@ def execute_command(command):
     except Exception as e:
         return f"[red]Failed to execute command:[/red] {e}"
 
-def detect_and_execute_command(reply):
-    """Определяет, содержит ли ответ команду, и выполняет её."""
+def detect_and_confirm_command(reply):
+    """Определяет, содержит ли ответ команду, и спрашивает, нужно ли её выполнить."""
     if "```" in reply:
         # Извлекаем содержимое команды между ``` и ```
         command = reply.split("```")[1].strip()
         console.print(f"[bold yellow]Detected Command:[/bold yellow] {command}")
-        result = execute_command(command)
-        console.print(f"[bold yellow]Command Output:[/bold yellow]")
-        console.print(result)
+
+        # Спрашиваем у пользователя, выполнять ли команду
+        user_input = console.input("[bold cyan]Execute this command? (Yes/No):[/bold cyan] ").strip().lower()
+        if user_input == "yes":
+            result = execute_command(command)
+            console.print(f"[bold yellow]Command Output:[/bold yellow]")
+            console.print(result)
+            return f"Command executed:\n{result}"
+        elif user_input == "no":
+            console.print("[bold green]Command not executed. Returning to chat.[/bold green]")
+            return "Command detected but not executed."
+    return reply
 
 def chat():
     console.print("[bold green]Starting LLM assistant. Type 'exit' to quit.[/bold green]")
@@ -74,12 +83,12 @@ def chat():
             )
             reply = response.choices[0].message.content.strip()
 
-            # Проверяем, если ответ содержит команду
-            detect_and_execute_command(reply)
+            # Проверяем, содержит ли ответ команду и спрашиваем, выполнять ли её
+            modified_reply = detect_and_confirm_command(reply)
 
-            # Проверяем, если ответ это просто текст
-            if not "```" in reply:
-                console.print(f"[bold green]Assistant:[/bold green] {reply}")
+            # Выводим ответ (с учётом модификации)
+            if not modified_reply.startswith("Command executed") and not modified_reply.startswith("Command detected"):
+                console.print(f"[bold green]Assistant:[/bold green] {modified_reply}")
 
             # Добавляем ответ в историю
             conversation_history.append({"role": "assistant", "content": reply})
