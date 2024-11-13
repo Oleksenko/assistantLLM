@@ -1,8 +1,7 @@
 import os
 import openai
-from assistantllm.utils import get_project_files
-import json
 
+# Загружаем API-ключ из конфигурации
 def load_api_key():
     config_path = os.path.join(os.getcwd(), "assistantLLM_config.json")
     if not os.path.exists(config_path):
@@ -27,15 +26,19 @@ def chat():
             print("Goodbye!")
             break
         
-        # Отправляем запрос к GPT
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant for a software project."},
-                {"role": "user", "content": user_input}
-            ]
-        )
-        print(f"Assistant: {response['choices'][0]['message']['content']}")
+        # Отправляем запрос к OpenAI API
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant for a software project."},
+                    {"role": "user", "content": user_input}
+                ]
+            )
+            reply = response['choices'][0]['message']['content']
+            print(f"Assistant: {reply}")
+        except Exception as e:
+            print(f"Error: {e}")
 
 def main():
     chat()
