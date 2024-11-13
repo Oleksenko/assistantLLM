@@ -3,9 +3,6 @@ import json
 import subprocess
 from openai import OpenAI
 from rich.console import Console
-from rich.text import Text
-from rich.syntax import Syntax
-from .file_reader import read_file_content, file_exists, is_project_file
 
 # Инициализация консоли rich
 console = Console()
@@ -31,8 +28,19 @@ client = OpenAI(
 
 # История диалога
 conversation_history = [
-    {"role": "system", "content": "You are a helpful assistant for a software project. If a user asks for a terminal command, provide the command clearly."}
+    {"role": "system", "content": "You are a helpful assistant for analyzing code and answering software-related questions."}
 ]
+
+def read_file_content(file_path):
+    """Читает содержимое файла."""
+    if not os.path.exists(file_path):
+        return None, f"[red]File {file_path} not found.[/red]"
+    try:
+        with open(file_path, "r") as file:
+            content = file.read()
+        return content, None
+    except Exception as e:
+        return None, f"[red]Error reading file {file_path}: {e}[/red]"
 
 def execute_command(command):
     """Выполняет команду в терминале с обработкой вывода."""
@@ -65,11 +73,8 @@ def detect_and_confirm_command(reply):
             return "Command detected but not executed."
     return reply
 
-def analyze_file(file_path, project_dir):
+def analyze_file(file_path):
     """Читает и анализирует содержимое файла."""
-    if not is_project_file(project_dir, file_path):
-        return f"[red]Error:[/red] File {file_path} is outside the project directory."
-
     content, error = read_file_content(file_path)
     if error:
         return error
@@ -93,10 +98,11 @@ def chat():
             console.print("[bold red]Goodbye![/bold red]")
             break
         
-        # Проверяем, является ли ввод путём к файлу
-        if file_exists(user_input):
+        # Если ввод пользователя является путём к файлу
+        file_path = os.path.join(project_dir, user_input)
+        if os.path.isfile(file_path):
             console.print(f"[bold yellow]File detected:[/bold yellow] {user_input}")
-            result = analyze_file(user_input, project_dir)
+            result = analyze_file(file_path)
             console.print(f"[bold yellow]Analysis Result:[/bold yellow]\n{result}")
             continue
 
