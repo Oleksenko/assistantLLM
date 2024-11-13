@@ -8,13 +8,12 @@ class PostInstallCommand(install):
     def run(self):
         # Выполняем стандартную установку
         install.run(self)
-        self.setup_project_files()
+        # Определяем директорию, где вызвана команда pip install
+        project_dir = os.getenv("PWD", os.getcwd())  # Получаем текущую директорию
+        self.setup_project_files(project_dir)
 
     @staticmethod
-    def setup_project_files():
-        # Определяем директорию, где запущена команда установки
-        project_dir = os.getcwd()
-
+    def setup_project_files(project_dir):
         # 1. Создаём assistantLLM_config.json
         config_path = os.path.join(project_dir, "assistantLLM_config.json")
         if not os.path.exists(config_path):
