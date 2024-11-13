@@ -2,9 +2,12 @@ from setuptools import setup, find_packages
 import os
 import json
 
-# Функция для создания файла конфигурации
-def create_config():
-    config_path = os.path.join(os.getcwd(), "assistantLLM_config.json")
+def setup_project_files():
+    # Определяем текущую директорию проекта
+    project_dir = os.getcwd()
+
+    # 1. Создаём файл assistantLLM_config.json
+    config_path = os.path.join(project_dir, "assistantLLM_config.json")
     if not os.path.exists(config_path):
         config_data = {
             "OPENAI_API_KEY": "your-api-key-here"  # Заглушка для ключа
@@ -13,9 +16,8 @@ def create_config():
             json.dump(config_data, f, indent=4)
         print(f"Config file created at {config_path}. Please update the OPENAI_API_KEY.")
 
-# Функция для добавления в .gitignore
-def add_to_gitignore():
-    gitignore_path = os.path.join(os.getcwd(), ".gitignore")
+    # 2. Добавляем в .gitignore
+    gitignore_path = os.path.join(project_dir, ".gitignore")
     entries = ["assistantLLM/", "assistantLLM_config.json"]
     if not os.path.exists(gitignore_path):
         with open(gitignore_path, "w") as f:
@@ -27,12 +29,12 @@ def add_to_gitignore():
             for entry in entries:
                 if entry not in lines:
                     f.write(f"{entry}\n")
+        print(f"Entries added to .gitignore: {entries}")
 
-# Вызов функций при установке
-create_config()
-add_to_gitignore()
+# Вызываем настройку перед установкой
+setup_project_files()
 
-# Основной setup
+# Основная установка
 setup(
     name="assistantLLM",
     version="0.1.0",
