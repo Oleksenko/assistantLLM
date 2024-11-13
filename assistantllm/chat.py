@@ -7,11 +7,11 @@ from rich.console import Console
 # Инициализация консоли rich
 console = Console()
 
-# Загружаем API-ключ из конфигурации
 def load_api_key():
+    """Загружает API-ключ из конфигурационного файла."""
     config_path = os.path.join(os.getcwd(), "assistantLLM_config.json")
     if not os.path.exists(config_path):
-        raise FileNotFoundError("Config file assistantLLM_config.json not found. Please re-install or create the file.")
+        raise FileNotFoundError("Config file assistantLLM_config.json not found.")
 
     with open(config_path, "r") as f:
         config = json.load(f)
@@ -21,15 +21,41 @@ def load_api_key():
 
     return config["OPENAI_API_KEY"]
 
-# Инициализируем клиента OpenAI
-client = OpenAI(
-    api_key=load_api_key()
-)
+# Инициализация клиента OpenAI
+client = OpenAI(api_key=load_api_key())
 
 # История диалога
 conversation_history = [
     {"role": "system", "content": "You are a helpful assistant for analyzing code and answering software-related questions."}
 ]
+
+def execute_command(command):
+    """Выполняет команду и возвращает результат."""
+    try:
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+        else:
+            return f"[red]Error:[/red] {result.stderr.strip()} (Exit code: {result.returncode})"
+    except Exception as e:
+        return f"[red]Failed to execute command:[/red] {e}"
+
+def detect_and_confirm_command(reply):
+    """Определяет, содержит ли ответ команду, и спрашивает, нужно ли её выполнить."""
+    if "```" in reply:
+        command = reply.split("```")[1].strip()
+        console.print(f"[bold yellow]Detected Command:[/bold yellow] {command}")
+
+        # Спрашиваем у пользователя, выполнять ли команду
+        user_input = console.input("[bold cyan]Execute this command? (Yes/No):[/bold cyan] ").strip().lower()
+        if user_input == "yes":
+            result = execute_command(command)
+            console.print(f"[bold yellow]Command Output:[/bold yellow] {result}")
+            return f"Command executed:\n{result}"
+        elif user_input == "no":
+            console.print("[bold green]Command not executed. Returning to chat.[/bold green]")
+            return "Command detected but not executed."
+    return reply
 
 def read_file_content(file_path):
     """Читает содержимое файла."""
@@ -41,37 +67,6 @@ def read_file_content(file_path):
         return content, None
     except Exception as e:
         return None, f"[red]Error reading file {file_path}: {e}[/red]"
-
-def execute_command(command):
-    """Выполняет команду в терминале с обработкой вывода."""
-    try:
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        for line in process.stdout:
-            console.print(line.strip())
-        process.wait()
-        if process.returncode == 0:
-            return "[bold green]Command executed successfully![/bold green]"
-        else:
-            return f"[red]Error:[/red] Command failed with exit code {process.returncode}"
-    except Exception as e:
-        return f"[red]Failed to execute command:[/red] {e}"
-
-def detect_and_confirm_command(reply):
-    """Определяет, содержит ли ответ команду, и спрашивает, нужно ли её выполнить."""
-    if "```" in reply:
-        command = reply.split("```")[1].strip()
-        console.print(f"[bold yellow]Detected Command:[/bold yellow] {command}")
-
-        user_input = console.input("[bold cyan]Execute this command? (Yes/No):[/bold cyan] ").strip().lower()
-        if user_input == "yes":
-            result = execute_command(command)
-            console.print(f"[bold yellow]Command Output:[/bold yellow]")
-            console.print(result)
-            return f"Command executed:\n{result}"
-        elif user_input == "no":
-            console.print("[bold green]Command not executed. Returning to chat.[/bold green]")
-            return "Command detected but not executed."
-    return reply
 
 def analyze_file(file_path):
     """Читает и анализирует содержимое файла."""
@@ -89,16 +84,18 @@ def analyze_file(file_path):
         return f"[red]Error interacting with LLM:[/red] {e}"
 
 def chat():
+    """Основной цикл общения."""
     console.print("[bold green]Starting LLM assistant. Type 'exit' to quit.[/bold green]")
     project_dir = os.getcwd()
+
     while True:
         user_input = console.input("[bold blue]You:[/bold blue] ")
 
         if user_input.lower() == "exit":
             console.print("[bold red]Goodbye![/bold red]")
             break
-        
-        # Если ввод пользователя является путём к файлу
+
+        # Если пользователь вводит путь к файлу
         file_path = os.path.join(project_dir, user_input)
         if os.path.isfile(file_path):
             console.print(f"[bold yellow]File detected:[/bold yellow] {user_input}")
@@ -106,10 +103,10 @@ def chat():
             console.print(f"[bold yellow]Analysis Result:[/bold yellow]\n{result}")
             continue
 
-        # Добавляем сообщение пользователя в историю
+        # Добавляем запрос пользователя в историю
         conversation_history.append({"role": "user", "content": user_input})
-        
-        # Отправляем запрос к OpenAI API
+
+        # Отправляем запрос к LLM
         try:
             response = client.chat.completions.create(
                 model="gpt-4",
@@ -117,8 +114,10 @@ def chat():
             )
             reply = response.choices[0].message.content.strip()
 
+            # Проверяем на наличие команды
             modified_reply = detect_and_confirm_command(reply)
 
+            # Если команда не была выполнена, выводим ответ
             if not modified_reply.startswith("Command executed") and not modified_reply.startswith("Command detected"):
                 console.print(f"[bold green]Assistant:[/bold green] {modified_reply}")
 
