@@ -5,6 +5,7 @@ from openai import OpenAI
 from rich.console import Console
 from rich.text import Text
 from rich.syntax import Syntax
+from file_reader import read_file_content, file_exists, is_project_file
 
 # Инициализация консоли rich
 console = Console()
@@ -36,14 +37,9 @@ conversation_history = [
 def execute_command(command):
     """Выполняет команду в терминале с обработкой вывода."""
     try:
-        # Открываем процесс для выполнения команды
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-        # Построчный вывод результата
         for line in process.stdout:
             console.print(line.strip())
-
-        # Проверяем завершение процесса
         process.wait()
         if process.returncode == 0:
             return "[bold green]Command executed successfully![/bold green]"
@@ -52,15 +48,12 @@ def execute_command(command):
     except Exception as e:
         return f"[red]Failed to execute command:[/red] {e}"
 
-
 def detect_and_confirm_command(reply):
     """Определяет, содержит ли ответ команду, и спрашивает, нужно ли её выполнить."""
     if "```" in reply:
-        # Извлекаем содержимое команды между ``` и ```
         command = reply.split("```")[1].strip()
         console.print(f"[bold yellow]Detected Command:[/bold yellow] {command}")
 
-        # Спрашиваем у пользователя, выполнять ли команду
         user_input = console.input("[bold cyan]Execute this command? (Yes/No):[/bold cyan] ").strip().lower()
         if user_input == "yes":
             result = execute_command(command)
@@ -72,8 +65,27 @@ def detect_and_confirm_command(reply):
             return "Command detected but not executed."
     return reply
 
+def analyze_file(file_path, project_dir):
+    """Читает и анализирует содержимое файла."""
+    if not is_project_file(project_dir, file_path):
+        return f"[red]Error:[/red] File {file_path} is outside the project directory."
+
+    content, error = read_file_content(file_path)
+    if error:
+        return error
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=conversation_history + [{"role": "user", "content": f"Analyze the following code:\n\n{content}"}]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"[red]Error interacting with LLM:[/red] {e}"
+
 def chat():
     console.print("[bold green]Starting LLM assistant. Type 'exit' to quit.[/bold green]")
+    project_dir = os.getcwd()
     while True:
         user_input = console.input("[bold blue]You:[/bold blue] ")
 
@@ -81,6 +93,13 @@ def chat():
             console.print("[bold red]Goodbye![/bold red]")
             break
         
+        # Проверяем, является ли ввод путём к файлу
+        if file_exists(user_input):
+            console.print(f"[bold yellow]File detected:[/bold yellow] {user_input}")
+            result = analyze_file(user_input, project_dir)
+            console.print(f"[bold yellow]Analysis Result:[/bold yellow]\n{result}")
+            continue
+
         # Добавляем сообщение пользователя в историю
         conversation_history.append({"role": "user", "content": user_input})
         
@@ -92,14 +111,11 @@ def chat():
             )
             reply = response.choices[0].message.content.strip()
 
-            # Проверяем, содержит ли ответ команду и спрашиваем, выполнять ли её
             modified_reply = detect_and_confirm_command(reply)
 
-            # Выводим ответ (с учётом модификации)
             if not modified_reply.startswith("Command executed") and not modified_reply.startswith("Command detected"):
                 console.print(f"[bold green]Assistant:[/bold green] {modified_reply}")
 
-            # Добавляем ответ в историю
             conversation_history.append({"role": "assistant", "content": reply})
         except Exception as e:
             console.print(f"[red]Error:[/red] {e}")
