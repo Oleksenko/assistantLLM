@@ -43,7 +43,7 @@ class PostInstallCommand(install):
 # Основной setup
 setup(
     name="assistantLLM",
-    version="0.1.0",
+    version="0.1.1",
     packages=find_packages(),
     install_requires=[
         "openai",  # Для взаимодействия с OpenAI API
