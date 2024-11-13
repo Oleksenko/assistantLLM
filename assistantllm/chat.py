@@ -2,6 +2,12 @@ import os
 import json
 import subprocess
 from openai import OpenAI
+from rich.console import Console
+from rich.text import Text
+from rich.syntax import Syntax
+
+# Инициализация консоли rich
+console = Console()
 
 # Загружаем API-ключ из конфигурации
 def load_api_key():
@@ -24,7 +30,7 @@ client = OpenAI(
 
 # История диалога
 conversation_history = [
-    {"role": "system", "content": "You are a helpful assistant for a software project."}
+    {"role": "system", "content": "You are a helpful assistant for a software project. If a user asks for a terminal command, provide the command clearly."}
 ]
 
 def execute_command(command):
@@ -34,29 +40,31 @@ def execute_command(command):
         if result.returncode == 0:
             return result.stdout.strip()  # Успешный результат
         else:
-            return f"Error: {result.stderr.strip()}"  # Ошибка выполнения
+            return f"[red]Error:[/red] {result.stderr.strip()}"  # Ошибка выполнения
     except Exception as e:
-        return f"Failed to execute command: {e}"
+        return f"[red]Failed to execute command:[/red] {e}"
+
+def detect_and_execute_command(reply):
+    """Определяет, содержит ли ответ команду, и выполняет её."""
+    if "```" in reply:
+        # Извлекаем содержимое команды между ``` и ```
+        command = reply.split("```")[1].strip()
+        console.print(f"[bold yellow]Detected Command:[/bold yellow] {command}")
+        result = execute_command(command)
+        console.print(f"[bold yellow]Command Output:[/bold yellow]")
+        console.print(result)
 
 def chat():
-    print("Starting LLM assistant. Type 'exit' to quit.")
+    console.print("[bold green]Starting LLM assistant. Type 'exit' to quit.[/bold green]")
     while True:
-        user_input = input("You: ")
+        user_input = console.input("[bold blue]You:[/bold blue] ")
+
         if user_input.lower() == "exit":
-            print("Goodbye!")
+            console.print("[bold red]Goodbye![/bold red]")
             break
         
         # Добавляем сообщение пользователя в историю
         conversation_history.append({"role": "user", "content": user_input})
-        
-        # Проверяем, нужно ли выполнить команду
-        if user_input.startswith("run:") or user_input.startswith("exec:"):
-            command = user_input.split(":", 1)[1].strip()
-            result = execute_command(command)
-            print(f"Command Output:\n{result}")
-            # Возвращаемся в диалог, добавляя результат выполнения команды
-            conversation_history.append({"role": "assistant", "content": f"Command executed:\n{result}"})
-            continue
         
         # Отправляем запрос к OpenAI API
         try:
@@ -65,11 +73,18 @@ def chat():
                 messages=conversation_history
             )
             reply = response.choices[0].message.content.strip()
-            print(f"Assistant: {reply}")
+
+            # Проверяем, если ответ содержит команду
+            detect_and_execute_command(reply)
+
+            # Проверяем, если ответ это просто текст
+            if not "```" in reply:
+                console.print(f"[bold green]Assistant:[/bold green] {reply}")
+
             # Добавляем ответ в историю
             conversation_history.append({"role": "assistant", "content": reply})
         except Exception as e:
-            print(f"Error: {e}")
+            console.print(f"[red]Error:[/red] {e}")
 
 def main():
     chat()
