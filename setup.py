@@ -1,40 +1,47 @@
 from setuptools import setup, find_packages
 import os
 import json
+from setuptools.command.install import install
 
-def setup_project_files():
-    # Определяем текущую директорию проекта
-    project_dir = os.getcwd()
+class PostInstallCommand(install):
+    """Класс для выполнения дополнительных действий после установки пакета."""
+    def run(self):
+        # Выполняем стандартную установку
+        install.run(self)
+        self.setup_project_files()
 
-    # 1. Создаём файл assistantLLM_config.json
-    config_path = os.path.join(project_dir, "assistantLLM_config.json")
-    if not os.path.exists(config_path):
-        config_data = {
-            "OPENAI_API_KEY": "your-api-key-here"  # Заглушка для ключа
-        }
-        with open(config_path, "w") as f:
-            json.dump(config_data, f, indent=4)
-        print(f"Config file created at {config_path}. Please update the OPENAI_API_KEY.")
+    @staticmethod
+    def setup_project_files():
+        # Определяем директорию, где запущена команда установки
+        project_dir = os.getcwd()
 
-    # 2. Добавляем в .gitignore
-    gitignore_path = os.path.join(project_dir, ".gitignore")
-    entries = ["assistantLLM/", "assistantLLM_config.json"]
-    if not os.path.exists(gitignore_path):
-        with open(gitignore_path, "w") as f:
-            f.write("\n".join(entries) + "\n")
-    else:
-        with open(gitignore_path, "r") as f:
-            lines = f.readlines()
-        with open(gitignore_path, "a") as f:
-            for entry in entries:
-                if entry not in lines:
-                    f.write(f"{entry}\n")
-        print(f"Entries added to .gitignore: {entries}")
+        # 1. Создаём assistantLLM_config.json
+        config_path = os.path.join(project_dir, "assistantLLM_config.json")
+        if not os.path.exists(config_path):
+            config_data = {
+                "OPENAI_API_KEY": "your-api-key-here"  # Заглушка для ключа
+            }
+            with open(config_path, "w") as f:
+                json.dump(config_data, f, indent=4)
+            print(f"Config file created at {config_path}. Please update the OPENAI_API_KEY.")
 
-# Вызываем настройку перед установкой
-setup_project_files()
+        # 2. Добавляем в .gitignore
+        gitignore_path = os.path.join(project_dir, ".gitignore")
+        entries = ["assistantLLM/", "assistantLLM_config.json"]
+        if not os.path.exists(gitignore_path):
+            with open(gitignore_path, "w") as f:
+                f.write("\n".join(entries) + "\n")
+        else:
+            with open(gitignore_path, "r") as f:
+                lines = f.readlines()
+            with open(gitignore_path, "a") as f:
+                for entry in entries:
+                    if entry not in lines:
+                        f.write(f"{entry}\n")
+            print(f"Entries added to .gitignore: {entries}")
 
-# Основная установка
+
+# Основной setup
 setup(
     name="assistantLLM",
     version="0.1.0",
@@ -42,6 +49,9 @@ setup(
     install_requires=[
         "openai",  # Для взаимодействия с OpenAI API
     ],
+    cmdclass={
+        'install': PostInstallCommand,  # Используем пост-инсталл команду
+    },
     entry_points={
         "console_scripts": [
             "assistantLLM=assistantllm.chat:main",  # Команда для запуска проекта
