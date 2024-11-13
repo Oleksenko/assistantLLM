@@ -1,4 +1,5 @@
 import os
+import json
 import openai
 
 # Загружаем API-ключ из конфигурации
