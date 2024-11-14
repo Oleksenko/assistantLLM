@@ -21,7 +21,6 @@ def load_api_key():
     return config["OPENAI_API_KEY"]
 
 client = OpenAI(api_key=load_api_key())
-# client = OpenAI(api_key='***REMOVED***proj-ahLQgzMVwWTQLi8MnJBAfyp8AALl_Zj8fr153_OMtZCxm6I1SueBoUswAKechaTstixKCAmy9jT3BlbkFJ2Sn5ib3tNnTPPEVeTZ62Z6l6xlZuEWFvcIylhdndz2TjAPDHzjtNJU_0w56WaP-RjiludgklAA')
 
 # История диалога
 conversation_history = [
