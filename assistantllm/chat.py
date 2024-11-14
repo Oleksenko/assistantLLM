@@ -85,17 +85,19 @@ def execute_command(command):
         return f"[red]Failed to execute command:[/red] {e}"
 
 def detect_and_confirm_command(reply):
-    """Определяет, содержит ли ответ команду, и спрашивает, нужно ли её выполнить."""
+    """Detects if the reply contains a command and prompts the user to execute it."""
     if "```" in reply:
+        # Extract the command from the reply
         command = reply.split("```")[1].strip()
         console.print(f"[bold yellow]Detected Command:[/bold yellow] {command}")
 
+        # Ask user to confirm command execution
         user_input = console.input("[bold cyan]Execute this command? (Yes/No):[/bold cyan] ").strip().lower()
-        if user_input == "y":
+        if user_input in ("yes", "y"):
             result = execute_command(command)
             console.print(f"[bold yellow]Command Output:[/bold yellow] {result}")
             return f"Command executed:\n{result}"
-        elif user_input == "n":
+        elif user_input in ("no", "n"):
             console.print("[bold green]Command not executed. Returning to chat.[/bold green]")
             return "Command detected but not executed."
     return reply
