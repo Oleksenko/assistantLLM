@@ -20,7 +20,8 @@ def load_api_key():
 
     return config["OPENAI_API_KEY"]
 
-client = OpenAI(api_key=load_api_key())
+# client = OpenAI(api_key=load_api_key())
+client = OpenAI(api_key='***REMOVED***proj-ahLQgzMVwWTQLi8MnJBAfyp8AALl_Zj8fr153_OMtZCxm6I1SueBoUswAKechaTstixKCAmy9jT3BlbkFJ2Sn5ib3tNnTPPEVeTZ62Z6l6xlZuEWFvcIylhdndz2TjAPDHzjtNJU_0w56WaP-RjiludgklAA')
 
 # История диалога
 conversation_history = [
@@ -44,13 +45,32 @@ def analyze_file(file_path):
     if error:
         return error
 
+    # Ограничиваем анализ первых 100 строк, если файл слишком большой
+    max_lines = 100
+    lines = content.split("\n")
+    if len(lines) > max_lines:
+        content = "\n".join(lines[:max_lines]) + "\n... [Truncated: File too large]"
+
+    # Выводим содержимое файла для проверки
+    console.print(f"[bold yellow]File Content Sent to LLM:[/bold yellow]\n{content}")
+
+    # Добавляем сообщение пользователя в историю
+    message = f"Analyze the following code:\n\n{content}"
+    console.print(f"[bold cyan]Sending to LLM:[/bold cyan] {message}")
+    conversation_history.append({"role": "user", "content": message})
+
     # Отправляем содержимое файла в LLM
     try:
         response = client.chat.completions.create(
             model="gpt-4",
-            messages=conversation_history + [{"role": "user", "content": f"Analyze the following code:\n\n{content}"}]
+            messages=conversation_history
         )
-        return response.choices[0].message.content.strip()
+        reply = response.choices[0].message.content.strip()
+
+        # Добавляем ответ в историю
+        conversation_history.append({"role": "assistant", "content": reply})
+
+        return reply
     except Exception as e:
         return f"[red]Error interacting with LLM:[/red] {e}"
 
@@ -72,11 +92,11 @@ def detect_and_confirm_command(reply):
         console.print(f"[bold yellow]Detected Command:[/bold yellow] {command}")
 
         user_input = console.input("[bold cyan]Execute this command? (Yes/No):[/bold cyan] ").strip().lower()
-        if user_input == "yes":
+        if user_input == "y":
             result = execute_command(command)
             console.print(f"[bold yellow]Command Output:[/bold yellow] {result}")
             return f"Command executed:\n{result}"
-        elif user_input == "no":
+        elif user_input == "n":
             console.print("[bold green]Command not executed. Returning to chat.[/bold green]")
             return "Command detected but not executed."
     return reply
@@ -93,16 +113,24 @@ def chat():
             console.print("[bold red]Goodbye![/bold red]")
             break
 
-        # Если пользователь вводит путь к файлу
-        file_path = os.path.join(project_dir, user_input)
-        if os.path.isfile(file_path):
-            console.print(f"[bold yellow]File detected:[/bold yellow] {user_input}")
-            result = analyze_file(file_path)
-            console.print(f"[bold yellow]Analysis Result:[/bold yellow]\n{result}")
-            continue
+        # Если запрос содержит путь к файлу, заменяем его содержимым
+        words = user_input.split()
+        for i, word in enumerate(words):
+            possible_path = os.path.join(project_dir, word)
+            if os.path.isfile(possible_path):
+                console.print(f"[bold yellow]File detected:[/bold yellow] {possible_path}")
+                content, error = read_file_content(possible_path)
+                if error:
+                    console.print(error)
+                else:
+                    # Подставляем содержимое файла вместо пути
+                    words[i] = f"```{content}```"
+
+        # Формируем окончательный запрос
+        processed_input = " ".join(words)
 
         # Добавляем текстовой запрос в историю
-        conversation_history.append({"role": "user", "content": user_input})
+        conversation_history.append({"role": "user", "content": processed_input})
 
         # Отправляем запрос к LLM
         try:
@@ -117,11 +145,53 @@ def chat():
 
             # Если команда не была выполнена, выводим обычный ответ
             if not modified_reply.startswith("Command executed") and not modified_reply.startswith("Command detected"):
-                console.print(f"[bold green]Assistant:[/bold green] {modified_reply}")
+                console.print(f"[bold green]Assistant:[/bold green] {reply}")
 
             conversation_history.append({"role": "assistant", "content": reply})
         except Exception as e:
             console.print(f"[red]Error:[/red] {e}")
+
+if __name__ == "__main__":
+    import sys
+    console.print("[bold cyan]Running in test mode.[/bold cyan]")
+
+    # Тестируем команды
+    if len(sys.argv) > 1 and sys.argv[1] == "test-command":
+        command = sys.argv[2] if len(sys.argv) > 2 else "ls"
+        result = execute_command(command)
+        console.print(f"[bold yellow]Command Output:[/bold yellow]\n{result}")
+
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "test-file":
+        file_path = sys.argv[2] if len(sys.argv) > 2 else "example.go"
+        
+        # Чтение файла
+        content, error = read_file_content(file_path)
+        if error:
+            console.print(error)
+        else:
+            console.print(f"[bold yellow]File Content:[/bold yellow]\n{content}")
+
+        # Анализ файла
+        result = analyze_file(file_path)
+        console.print(f"[bold yellow]Analysis Result:[/bold yellow]\n{result}")
+
+    if len(sys.argv) > 1 and sys.argv[1] == "test-both":
+        # Выполнение команды
+        command = "ls"
+        command_result = execute_command(command)
+        console.print(f"[bold yellow]Command Output:[/bold yellow]\n{command_result}")
+        
+        # Анализ файла
+        file_path = sys.argv[2] if len(sys.argv) > 2 else "example.go"
+        file_result = analyze_file(file_path)
+        console.print(f"[bold yellow]File Analysis Result:[/bold yellow]\n{file_result}")
+
+
+    # Запускаем полный чат
+    else:
+        chat()
+
 
 def main():
     chat()
